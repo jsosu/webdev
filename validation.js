@@ -5,24 +5,23 @@ const password_input = document.getElementById('password-input');
 const repeat_password_input = document.getElementById('repeat-password-input');
 const error_message = document.getElementById('error-message');
 
-// VERY SIMPLE localStorage Database
 const SimpleDB = {
-    // Get all users from localStorage
+    
     getUsers() {
         const users = localStorage.getItem('users');
         return users ? JSON.parse(users) : [];
     },
 
-    // Save users to localStorage
+    
     saveUsers(users) {
         localStorage.setItem('users', JSON.stringify(users));
     },
 
-    // Add a new user
+    
     addUser(user) {
         const users = this.getUsers();
         
-        // Check if user already exists
+        
         if (users.find(u => u.email === user.email)) {
             throw new Error('User already exists');
         }
@@ -32,19 +31,17 @@ const SimpleDB = {
         return user;
     },
 
-    // Find user by email
+    
     getUserByEmail(email) {
         const users = this.getUsers();
         return users.find(u => u.email === email) || null;
     },
 
-    // Check if user exists
+    
     userExists(email) {
         return this.getUserByEmail(email) !== null;
     }
 };
-
-// Remove all the complex IndexedDB code and replace the form submit handler:
 
 form.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -52,7 +49,7 @@ form.addEventListener('submit', (e) => {
     let errors = [];
 
     if (firstname_input) {
-        // Signup validation
+        
         errors = getSignupFormErrors(
             firstname_input.value,
             email_input.value,
@@ -60,7 +57,7 @@ form.addEventListener('submit', (e) => {
             repeat_password_input.value
         );
     } else {
-        // Login validation
+        
         errors = getLoginFormErrors(email_input.value, password_input.value);
     }
 
@@ -111,7 +108,7 @@ form.addEventListener('submit', (e) => {
                 error_message.innerText = 'Failed to create account. Please try again.';
             }
         } else {
-            // LOGIN - Simple version
+            
             const user = SimpleDB.getUserByEmail(email_input.value);
             
             if (!user) {
@@ -130,27 +127,27 @@ form.addEventListener('submit', (e) => {
                 return;
             }
 
-            // Login successful - store user session
+            
             localStorage.setItem('currentUser', JSON.stringify({
                 email: user.email,
                 firstname: user.firstname,
                 loggedIn: true
             }));
 
-            // Show success message
+            
             error_message.classList.remove('error');
             error_message.classList.add('success', 'show');
             error_message.innerText = 'Login successful! Redirecting...';
 
             // Redirect to dashboard or home page
-            setTimeout(() => {
-                window.location.href = 'dashboard.html';
-            }, 1000);
+           // setTimeout(() => {
+            // window.location.href = 'dashboard.html';
+           // }, 1000);
         }
     }
 });
 
-// Keep all your existing validation functions (they work perfectly):
+
 function getSignupFormErrors(firstname, email, password, repeatPassword) {
     let errors = [];
     clearErrorStyles();
