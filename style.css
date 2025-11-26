@@ -134,7 +134,7 @@ form div.incorrect input{
 #error-message{
     color: red;
 }
-.error-message.success {
+#error-message.success {
     color: green;
     background-color: #efe;
     border: 1px solid #cfc;

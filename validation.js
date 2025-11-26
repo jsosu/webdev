@@ -5,7 +5,48 @@ const password_input = document.getElementById('password-input');
 const repeat_password_input = document.getElementById('repeat-password-input');
 const error_message = document.getElementById('error-message');
 
-form.addEventListener('submit', async (e) => {
+// VERY SIMPLE localStorage Database
+const SimpleDB = {
+    // Get all users from localStorage
+    getUsers() {
+        const users = localStorage.getItem('users');
+        return users ? JSON.parse(users) : [];
+    },
+
+    // Save users to localStorage
+    saveUsers(users) {
+        localStorage.setItem('users', JSON.stringify(users));
+    },
+
+    // Add a new user
+    addUser(user) {
+        const users = this.getUsers();
+        
+        // Check if user already exists
+        if (users.find(u => u.email === user.email)) {
+            throw new Error('User already exists');
+        }
+        
+        users.push(user);
+        this.saveUsers(users);
+        return user;
+    },
+
+    // Find user by email
+    getUserByEmail(email) {
+        const users = this.getUsers();
+        return users.find(u => u.email === email) || null;
+    },
+
+    // Check if user exists
+    userExists(email) {
+        return this.getUserByEmail(email) !== null;
+    }
+};
+
+// Remove all the complex IndexedDB code and replace the form submit handler:
+
+form.addEventListener('submit', (e) => {
     e.preventDefault();
 
     let errors = [];
@@ -30,73 +71,114 @@ form.addEventListener('submit', async (e) => {
         error_message.innerText = errors.join(". ");
     } else {
         if (firstname_input) {
-            // Signup: send data to server
-            const userData = {
-                firstname: firstname_input.value,
-                email: email_input.value,
-                password: password_input.value,
-                repeatPassword: repeat_password_input.value
-            };
-
+            // SIGNUP - Simple version
             try {
-                const response = await fetch("http://localhost:5000/api/signup", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(userData)
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    error_message.classList.remove('error');
-                    error_message.classList.add('success', 'show');
-                    error_message.innerText = 'Account created successfully! Redirecting to login...';
-
-                    // Redirect after 2 seconds
-                    setTimeout(() => {
-                        window.location.href = 'login.html';
-                    }, 2000);
-                } else {
-                    // Server returned an error
+                if (SimpleDB.userExists(email_input.value)) {
                     error_message.classList.remove('success');
                     error_message.classList.add('error', 'show');
-                    error_message.innerText = data.message || 'Signup failed. Please try again.';
+                    error_message.innerText = 'User with this email already exists.';
+                    email_input.parentElement.classList.add('incorrect');
+                    return;
                 }
-            } catch (err) {
-                console.error('Network Error:', err);
+
+                // Create new user
+                const user = {
+                    firstname: firstname_input.value,
+                    email: email_input.value,
+                    password: password_input.value,
+                    createdAt: new Date().toISOString()
+                };
+
+                SimpleDB.addUser(user);
+                
+                // Show success message and redirect
+                error_message.classList.remove('error');
+                error_message.classList.add('success', 'show');
+                error_message.innerText = 'Account created successfully! Redirecting to login...';
+
+                // Clear form
+                form.reset();
+
+                // Redirect after 2 seconds
+                setTimeout(() => {
+                    window.location.href = 'login.html';
+                }, 2000);
+
+            } catch (error) {
+                console.error('Signup error:', error);
                 error_message.classList.remove('success');
                 error_message.classList.add('error', 'show');
-                error_message.innerText = 'Network error. Please try again.';
+                error_message.innerText = 'Failed to create account. Please try again.';
+            }
+        } else {
+            // LOGIN - Simple version
+            const user = SimpleDB.getUserByEmail(email_input.value);
+            
+            if (!user) {
+                error_message.classList.remove('success');
+                error_message.classList.add('error', 'show');
+                error_message.innerText = 'No account found with this email.';
+                email_input.parentElement.classList.add('incorrect');
+                return;
             }
 
-        } else {
-            // Login: submit form normally
-            form.submit();
+            if (user.password !== password_input.value) {
+                error_message.classList.remove('success');
+                error_message.classList.add('error', 'show');
+                error_message.innerText = 'Invalid password.';
+                password_input.parentElement.classList.add('incorrect');
+                return;
+            }
+
+            // Login successful - store user session
+            localStorage.setItem('currentUser', JSON.stringify({
+                email: user.email,
+                firstname: user.firstname,
+                loggedIn: true
+            }));
+
+            // Show success message
+            error_message.classList.remove('error');
+            error_message.classList.add('success', 'show');
+            error_message.innerText = 'Login successful! Redirecting...';
+
+            // Redirect to dashboard or home page
+            setTimeout(() => {
+                window.location.href = 'dashboard.html';
+            }, 1000);
         }
     }
 });
 
+// Keep all your existing validation functions (they work perfectly):
 function getSignupFormErrors(firstname, email, password, repeatPassword) {
     let errors = [];
-
     clearErrorStyles();
 
     if (!firstname) {
         errors.push('Firstname is required');
         firstname_input.parentElement.classList.add('incorrect');
+    } else if (firstname.length < 2) {
+        errors.push('Firstname must be at least 2 characters long');
+        firstname_input.parentElement.classList.add('incorrect');
     }
+
     if (!email) {
         errors.push('Email is required');
         email_input.parentElement.classList.add('incorrect');
+    } else if (!isValidEmail(email)) {
+        errors.push('Please enter a valid email address');
+        email_input.parentElement.classList.add('incorrect');
     }
+
     if (!password) {
         errors.push('Password is required');
         password_input.parentElement.classList.add('incorrect');
-    }
-    if (password && password.length < 8) {
+    } else if (password.length < 8) {
         errors.push('Password must have at least 8 characters');
         password_input.parentElement.classList.add('incorrect');
     }
+
     if (password !== repeatPassword) {
         errors.push('Password does not match repeated password');
         password_input.parentElement.classList.add('incorrect');
@@ -106,23 +188,29 @@ function getSignupFormErrors(firstname, email, password, repeatPassword) {
     return errors;
 }
 
-function getLoginFormErrors(email, password) {{
+function getLoginFormErrors(email, password) {
     let errors = [];
-
     clearErrorStyles();
 
     if (!email) {
         errors.push('Email is required');
         email_input.parentElement.classList.add('incorrect');
+    } else if (!isValidEmail(email)) {
+        errors.push('Please enter a valid email address');
+        email_input.parentElement.classList.add('incorrect');
     }
+
     if (!password) {
         errors.push('Password is required');
         password_input.parentElement.classList.add('incorrect');
     }
 
-    return errors;  
+    return errors;
 }
- window.location.href = "dashboard.html";
+
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
 }
 
 function clearErrorStyles() {
